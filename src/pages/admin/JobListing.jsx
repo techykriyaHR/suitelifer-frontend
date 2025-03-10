@@ -22,6 +22,8 @@ import {
   TableCell,
   TableBody,
 } from "@mui/material";
+import axios from "axios";
+import config from "../../config";
 
 const initialJobListings = [
   {
@@ -91,7 +93,7 @@ const initialSetup = ["Remote", "Hybrid", "On-Site", "In-Office"];
 export default function JobListing() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIndustry, setSelectedIndustry] = useState("all");
-  const [jobListings, setJobListings] = useState(initialJobListings);
+  const [jobListings, setJobListings] = useState([]);
   const [filteredJobListings, setFilteredJobListings] =
     useState(initialJobListings);
 
@@ -101,7 +103,7 @@ export default function JobListing() {
   const [openIndustryModal, setOpenIndustryModal] = useState(false);
   const [editJob, setEditJob] = useState(null);
   const [editIndustry, setEditIndustry] = useState(null);
-  const [newIndustry, setNewIndustry] = useState();
+  const [industryName, setIndustryName] = useState();
   const [openManageIndustryModal, setOpenManageIndustryModal] = useState(false);
   const [setup, setSetup] = useState(initialSetup);
   const [newSetUp, setNewSetUp] = useState("");
@@ -131,7 +133,7 @@ export default function JobListing() {
 
   useEffect(() => {
     const filtered = jobListings.filter((job) => {
-      const matchesSearchQuery = job.title
+      const matchesSearchQuery = job.jobTitle
         .toLowerCase()
         .includes(searchQuery.toLowerCase());
       const matchesIndustry =
@@ -139,7 +141,17 @@ export default function JobListing() {
       return matchesSearchQuery && matchesIndustry;
     });
     setFilteredJobListings(filtered);
-  }, [searchQuery, selectedIndustry, jobListings]);
+
+    const fetchJobListings = async () => {
+      const response = (await axios.get(`${config.apiBaseUrl}/api/all-jobs`))
+        .data;
+
+      console.log(response.data);
+      setJobListings(response.data);
+    };
+
+    fetchJobListings();
+  }, []);
 
   const totalJobListings = filteredJobListings.length;
   const openJobListings = filteredJobListings.filter(
@@ -166,19 +178,21 @@ export default function JobListing() {
   const handleAddIndustry = () => {
     if (editIndustry !== null) {
       const updatedIndustries = industries.map((industry, index) =>
-        index === editIndustry ? { name: newIndustry, assessmentUrl } : industry
+        index === editIndustry
+          ? { name: industryName, assessmentUrl }
+          : industry
       );
 
       setIndustries(updatedIndustries);
       setEditIndustry(null);
     } else if (
-      newIndustry &&
-      !industries.some((ind) => ind.name === newIndustry)
+      industryName &&
+      !industries.some((ind) => ind.name === industryName)
     ) {
-      setIndustries([...industries, { name: newIndustry, assessmentUrl }]);
+      setIndustries([...industries, { name: industryName, assessmentUrl }]);
     }
 
-    setNewIndustry("");
+    setIndustryName("");
     setAssessmentUrl("");
     setOpenIndustryModal(false);
   };
@@ -270,7 +284,7 @@ export default function JobListing() {
             {industries.length}
           </div>
         </div>
-        <div className="border px-4 py-2 rounded-md w-50 bg-gray-200"> 
+        <div className="border px-4 py-2 rounded-md w-50 bg-gray-200">
           <div className="text-lg text-center">Job Listings</div>
           <div className="text-2xl font-bold text-center">
             {totalJobListings}
@@ -342,20 +356,24 @@ export default function JobListing() {
             </tr>
           </thead>
           <tbody>
-            {filteredJobListings.map((job, index) => (
+            {jobListings.map((job, index) => (
               <tr
                 key={index}
                 className={index % 2 === 0 ? "bg-tertiary" : "bg-white"}
               >
-                <td className="py-2 px-5 font-medium">{job.title}</td>
+                <td className="py-2 px-5 font-medium">{job.jobTitle}</td>
                 <td className="p-2 line-clamp-1">
                   <Tooltip title={job.description} arrow>
-                    <span>{job.description}</span>
+                    <span>
+                      {job.description.length > 100
+                        ? `${job.description.slice(0, 100)}...`
+                        : job.description}
+                    </span>
                   </Tooltip>
                 </td>
-                <td className="p-2">{job.type}</td>
-                <td className="p-2">{job.status === 1 ? "Open" : "Closed"}</td>
-                <td className="p-2">{job.setup}</td>
+                <td className="p-2">{job.employmentType}</td>
+                <td className="p-2">{job.isOpen === 1 ? "Open" : "Closed"}</td>
+                <td className="p-2">{job.setupName}</td>
                 <td className="p-2">
                   {job.visibility === 1 ? "Shown" : "Hidden"}
                 </td>
@@ -364,7 +382,7 @@ export default function JobListing() {
                     className="bg-transparent p-2 rounded w-8 items-center"
                     onClick={() => handleEditJob(index)}
                   >
-                      <EditIcon onClick/>
+                    <EditIcon />
                   </button>
                 </td>
               </tr>
@@ -529,8 +547,7 @@ export default function JobListing() {
                 <button
                   onClick={() => setOpenJobModal(false)}
                   variant="filled"
-                 className="btn-light"
-                 
+                  className="btn-light"
                 >
                   Cancel
                 </button>
@@ -566,28 +583,25 @@ export default function JobListing() {
               <TextField
                 label="Industry Name"
                 fullWidth
-                value={newIndustry}
-                onChange={(e) => setNewIndustry(e.target.value)}
+                value={industryName}
+                onChange={(e) => setIndustryName(e.target.value)}
                 className="mt-2"
                 sx={{ bgcolor: "#fbe9e7" }}
               />
-              </div>
-              <TextField
-                label="Assessment URL"
-                fullWidth
-                value={assessmentUrl}
-                onChange={(e) =>
-                  setAssessmentUrl((au) => (au = e.target.value))
-                }
-                className="mt-2"
-                sx={{ bgcolor: "#fbe9e7" }}
-              />
-            
+            </div>
+            <TextField
+              label="Assessment URL"
+              fullWidth
+              value={assessmentUrl}
+              onChange={(e) => setAssessmentUrl((au) => (au = e.target.value))}
+              className="mt-2"
+              sx={{ bgcolor: "#fbe9e7" }}
+            />
+
             <div className="mt-6 flex justify-end gap-x-3">
               <button
                 onClick={() => setOpenIndustryModal(false)}
                 className="btn-light"
-                
               >
                 Cancel
               </button>
